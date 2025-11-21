@@ -45,16 +45,17 @@ def relax_struct(struct: Atoms, mlip: tuple[str, Any], pressure: float) -> Atoms
         Built bulk crystal.
     """
     model_name, model = mlip
-    arch = model.class_name
     calc = model.get_calculator()
 
+    struct.calc = calc
     geom_opt = GeomOpt(
         struct=struct,
-        arch=arch,  # will this work???
-        model_path=calc,
+        fmax=0.5,
         filter_kwargs={"scalar_pressure": pressure},
     )
+
     geom_opt.run()
+
     return geom_opt.struct
 
 
@@ -89,7 +90,7 @@ def create_triangular_cell(struct: Atoms) -> None:
 @pytest.mark.parametrize("mlip", MODELS.items())
 def test_dynamic_md(mlip: tuple[str, Any]) -> None:
     """
-    Run calculations required for dynamic high pressure hydrogen tests.
+    Run MLMD to calculate properties for the dynamic high-pressure hydrogen tests.
 
     Parameters
     ----------
@@ -148,7 +149,7 @@ def test_dynamic_md(mlip: tuple[str, Any]) -> None:
 @pytest.mark.parametrize("mlip", MODELS.items())
 def test_static_md(mlip: tuple[str, Any]) -> None:
     """
-    Run calculations required for static high pressure hydrogen tests.
+    Evaluate an existing AIMD trajectory for the static high-pressure hydrogen tests.
 
     Parameters
     ----------
@@ -158,10 +159,10 @@ def test_static_md(mlip: tuple[str, Any]) -> None:
     struct_path = DATA_PATH / "Hpres.xyz"
 
     model_name, model = mlip
-    arch = model.class_name
     calc = model.get_calculator()
 
     structs = read(struct_path, index="::50")
+    structs.calc = calc
     for struct in structs:
         struct.info["density"] = (
             np.sum(struct.get_masses()) / struct.get_volume() * DENS_FACT
@@ -169,8 +170,6 @@ def test_static_md(mlip: tuple[str, Any]) -> None:
 
     SinglePoint(
         struct=structs,
-        arch=arch,
-        model_path=calc,
         write_results=True,
         file_prefix=OUT_PATH / f"H-static-{mlip}",
     ).run()
