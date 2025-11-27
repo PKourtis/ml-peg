@@ -15,7 +15,12 @@ from ml_peg.analysis.utils.utils import calc_table_scores, get_table_style
 from ml_peg.app import APP_ROOT
 from ml_peg.app.utils.build_components import build_footer, build_weight_components
 from ml_peg.app.utils.register_callbacks import register_benchmark_to_category_callback
-from ml_peg.app.utils.utils import calculate_column_widths, sig_fig_format
+from ml_peg.app.utils.utils import (
+    build_level_of_theory_warnings,
+    calculate_column_widths,
+    load_model_registry_configs,
+    sig_fig_format,
+)
 from ml_peg.models.get_models import get_model_names
 from ml_peg.models.models import current_models
 
@@ -122,7 +127,9 @@ def build_category(
 
         # Build category summary table
         summary_table = build_summary_table(
-            all_tables[category], table_id=f"{category_title}-summary-table"
+            all_tables[category],
+            table_id=f"{category_title}-summary-table",
+            description=category_descrip,
         )
         category_tables[category_title] = summary_table
 
@@ -150,18 +157,21 @@ def build_category(
         )
 
         # Register benchmark table -> category table callbacks
+        # Category summary table columns add "Score" to name for clarity
         for test_name, benchmark_table in all_tables[category].items():
             register_benchmark_to_category_callback(
                 benchmark_table_id=benchmark_table.id,
                 category_table_id=f"{category_title}-summary-table",
-                benchmark_column=test_name,
+                benchmark_column=test_name + " Score",
             )
 
     return category_layouts, category_tables
 
 
 def build_summary_table(
-    tables: dict[str, DataTable], table_id: str = "summary-table"
+    tables: dict[str, DataTable],
+    table_id: str = "summary-table",
+    description: str | None = None,
 ) -> DataTable:
     """
     Build summary table from a set of tables.
@@ -172,11 +182,13 @@ def build_summary_table(
         Dictionary of tables to be summarised.
     table_id
         ID of table being built. Default is 'summary-table'.
+    description
+        Description of summary table. Default is None.
 
     Returns
     -------
     DataTable
-        Summary table with score from table being summarised.
+        Summary table with scores from tables being summarised.
     """
     summary_data = {}
     for category_name, table in tables.items():
@@ -186,8 +198,9 @@ def build_summary_table(
 
         for row in table.data:
             # Category tables may include models not to be included
+            # Table headings are of the form "[category] Score"
             if row["MLIP"] in summary_data:
-                summary_data[row["MLIP"]][category_name] = row["Score"]
+                summary_data[row["MLIP"]][f"{category_name} Score"] = row["Score"]
 
     data = []
     for mlip in summary_data:
@@ -195,9 +208,13 @@ def build_summary_table(
 
     data = calc_table_scores(data)
 
-    columns_headers = ("MLIP",) + tuple(tables.keys()) + ("Score",)
+    columns_headers = ("MLIP",) + tuple(key + " Score" for key in tables) + ("Score",)
 
     columns = [{"name": headers, "id": headers} for headers in columns_headers]
+    tooltip_header = {
+        header + " Score": table.description for header, table in tables.items()
+    }
+
     for column in columns:
         column_id = column["id"]
         if column_id != "MLIP":
@@ -205,6 +222,23 @@ def build_summary_table(
             column["format"] = sig_fig_format()
 
     style = get_table_style(data)
+    registry_configs = load_model_registry_configs()
+    row_models: list[str] = []
+    for row in data:
+        mlip = row.get("MLIP")
+        if isinstance(mlip, str) and mlip not in row_models:
+            row_models.append(mlip)
+    model_configs = {mlip: (registry_configs.get(mlip) or {}) for mlip in row_models}
+    model_levels = {
+        mlip: (model_configs[mlip].get("level_of_theory")) for mlip in row_models
+    }
+    warning_styles, tooltip_rows = build_level_of_theory_warnings(
+        data,
+        model_levels,
+        {},
+        model_configs,
+    )
+    style_with_warnings = style + warning_styles
 
     # Calculate column widths based on column names
     column_widths = calculate_column_widths(columns_headers)
@@ -222,18 +256,28 @@ def build_summary_table(
             }
         )
 
+    tooltip_header["Score"] = "Weighted average of scores (higher is better)"
+
     table = DataTable(
         data=data,
         columns=columns,
         id=table_id,
         sort_action="native",
-        style_data_conditional=style,
+        style_data_conditional=style_with_warnings,
         style_cell_conditional=style_cell_conditional,
+        tooltip_data=tooltip_rows,
+        tooltip_delay=100,
+        tooltip_duration=None,
         persistence=True,
         persistence_type="session",
         persisted_props=["data"],
+        tooltip_header=tooltip_header,
     )
     table.column_widths = column_widths
+    table.description = description
+    table.model_levels_of_theory = model_levels
+    table.metric_levels_of_theory = {}
+    table.model_configs = model_configs
     return table
 
 

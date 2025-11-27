@@ -1,6 +1,6 @@
 [project]
 name = "ml-peg"
-version = "0.0.1"
+version = "0.1.1"
 description = "ML potential usability and performance guide"
 authors = [
     { name = "Elliott Kasoar" },
@@ -31,6 +31,8 @@ dependencies = [
     "mlipx<0.2,>=0.1.5",
     "scikit-learn>=1.7.1",
     "typer<1.0.0,>=0.19.1",
+    "matcalc",
+    "matminer",
 ]
 
 [project.optional-dependencies]

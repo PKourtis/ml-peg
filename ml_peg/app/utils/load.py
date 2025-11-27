@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
 import json
 from pathlib import Path
 
@@ -11,6 +12,7 @@ from plotly.io import read_json
 
 from ml_peg.analysis.utils.utils import calc_metric_scores, get_table_style
 from ml_peg.app.utils.utils import (
+    build_level_of_theory_warnings,
     calculate_column_widths,
     clean_thresholds,
     clean_weights,
@@ -19,7 +21,9 @@ from ml_peg.app.utils.utils import (
 )
 
 
-def rebuild_table(filename: str | Path, id: str) -> DataTable:
+def rebuild_table(
+    filename: str | Path, id: str, description: str | None = None
+) -> DataTable:
     """
     Rebuild saved dash table.
 
@@ -29,6 +33,8 @@ def rebuild_table(filename: str | Path, id: str) -> DataTable:
         Name of json file with saved table data.
     id
         ID for table.
+    description
+        Description of table. Default is None.
 
     Returns
     -------
@@ -85,6 +91,13 @@ def rebuild_table(filename: str | Path, id: str) -> DataTable:
     scored_data = calc_metric_scores(data, thresholds)
     style = get_table_style(data, scored_data=scored_data)
     column_widths = calculate_column_widths(width_labels)
+    model_levels = table_json.get("model_levels_of_theory") or {}
+    metric_levels = table_json.get("metric_levels_of_theory") or {}
+    model_configs = table_json.get("model_configs") or {}
+    warning_styles, tooltip_rows = build_level_of_theory_warnings(
+        data, model_levels, metric_levels, model_configs
+    )
+    style_with_warnings = style + warning_styles
 
     style_cell_conditional: list[dict[str, object]] = []
     for column_id, width in column_widths.items():
@@ -110,7 +123,7 @@ def rebuild_table(filename: str | Path, id: str) -> DataTable:
         tooltip_duration=None,
         editable=True,
         id=id,
-        style_data_conditional=style,
+        style_data_conditional=style_with_warnings,
         style_cell_conditional=style_cell_conditional,
         sort_action="native",
         persistence=True,
@@ -125,6 +138,11 @@ def rebuild_table(filename: str | Path, id: str) -> DataTable:
 
     table.thresholds = thresholds
     table.weights = weights
+    table.description = description
+    table.model_levels_of_theory = model_levels
+    table.metric_levels_of_theory = metric_levels
+    table.model_configs = model_configs
+    table.tooltip_data = tooltip_rows
 
     return table
 
@@ -146,3 +164,85 @@ def read_plot(filename: str | Path, id: str = "figure-1") -> Graph:
         Loaded plotly Graph.
     """
     return Graph(id=id, figure=read_json(filename))
+
+
+def _filter_density_figure_for_model(fig_dict: dict, model: str) -> dict:
+    """
+    Filter a density-plot figure dict to a single model trace.
+
+    Keeps the y=x reference line and swaps to the annotation matching the model,
+    using metadata stored by ``plot_density_scatter``.
+
+    Parameters
+    ----------
+    fig_dict
+        Figure dictionary loaded from saved density-plot JSON.
+    model
+        Model name to keep visible in the filtered figure.
+
+    Returns
+    -------
+    dict
+        Filtered figure dictionary with only the requested model trace and reference
+        line.
+    """
+    data = fig_dict.get("data", [])
+    layout = deepcopy(fig_dict.get("layout"))
+    annotations_meta = layout.get("meta")
+
+    fig_data = []
+    for trace in data:
+        name = trace.get("name")
+        if name is None or name == model:
+            # ``name`` is ``None`` for the y=x reference line; keep that and the
+            # requested model trace visible while hiding their legend entries.
+            trace_copy = deepcopy(trace)
+            trace_copy["visible"] = True
+            trace_copy["showlegend"] = False
+            fig_data.append(trace_copy)
+
+    # Pick the matching annotation (Plotly layout annotation with MAE/exclusion text)
+    stored_annotations = (
+        annotations_meta.get("annotations") if annotations_meta else None
+    )
+    model_order = annotations_meta.get("models") if annotations_meta else None
+    chosen_annotation = None
+    if isinstance(stored_annotations, list) and isinstance(model_order, list):
+        try:
+            idx = model_order.index(model)
+            if idx < len(stored_annotations):
+                chosen_annotation = stored_annotations[idx]
+        except ValueError:
+            pass
+    if chosen_annotation:
+        layout["annotations"] = [chosen_annotation]
+
+    # Hide legend entirely to prevent overlap with the density colorbar.
+    layout["showlegend"] = False
+
+    return {"data": fig_data, "layout": layout}
+
+
+def read_density_plot_for_model(
+    filename: str | Path, model: str, id: str = "figure-1"
+) -> Graph:
+    """
+    Read a density-plot JSON and return a Graph filtered to a single model.
+
+    Parameters
+    ----------
+    filename
+        Path to saved density-plot JSON.
+    model
+        Model name to keep visible in the returned figure.
+    id
+        Dash component id for the Graph.
+
+    Returns
+    -------
+    Graph
+        Dash Graph displaying only the requested model (plus reference line).
+    """
+    with open(filename) as f:
+        fig_dict = json.load(f)
+    return Graph(id=id, figure=_filter_density_figure_for_model(fig_dict, model))

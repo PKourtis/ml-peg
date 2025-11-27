@@ -56,6 +56,7 @@ def grid_template_from_widths(
 def build_weight_input(
     input_id: str,
     default_value: float | None,
+    show_label: bool = False,
 ) -> Div:
     """
     Build numeric input for a metric weight.
@@ -66,6 +67,8 @@ def build_weight_input(
         ID for text box input component.
     default_value
         Default value for the text box input.
+    show_label
+        Whether to show the "Weight:" label (only for first column).
 
     Returns
     -------
@@ -78,6 +81,7 @@ def build_weight_input(
         "alignItems": "center",
         "boxSizing": "border-box",
         "border": "1px solid transparent",
+        "position": "relative",
     }
     wrapper_style.update(
         {
@@ -88,23 +92,39 @@ def build_weight_input(
         }
     )
 
-    return Div(
+    children = []
+    if show_label:
+        children.append(
+            Label(
+                "Weight:",
+                style={
+                    "fontSize": "13px",
+                    "color": "#6c757d",
+                    "textAlign": "right",
+                    "position": "absolute",
+                    "right": "calc(50% + 38px)",
+                },
+            )
+        )
+
+    children.append(
         DCC_Input(
             id=input_id,
             type="number",
             value=default_value,
             step=0.1,
             style={
-                "width": "80px",
+                "width": "60px",
                 "fontSize": "12px",
                 "padding": "2px 4px",
                 "border": "1px solid #6c757d",
                 "borderRadius": "3px",
                 "textAlign": "center",
             },
-        ),
-        style=wrapper_style,
+        )
     )
+
+    return Div(children, style=wrapper_style)
 
 
 def build_weight_components(
@@ -168,8 +188,9 @@ def build_weight_components(
         build_weight_input(
             input_id=f"{input_id}-input",
             default_value=weights[column],
+            show_label=(i == 0),
         )
-        for column, input_id in zip(columns, input_ids, strict=True)
+        for i, (column, input_id) in enumerate(zip(columns, input_ids, strict=True))
     ]
 
     container = Div(
@@ -189,13 +210,14 @@ def build_weight_components(
                         },
                     ),
                     Button(
-                        "Reset Weights",
+                        "Reset",
                         id=f"{table.id}-reset-button",
                         n_clicks=0,
                         style={
                             "fontSize": "11px",
                             "padding": "4px 8px",
-                            "marginTop": "6px",
+                            "marginTop": "0px",
+                            "marginLeft": "4px",
                             "backgroundColor": "#6c757d",
                             "color": "white",
                             "border": "none",
@@ -245,10 +267,12 @@ def build_weight_components(
             "alignItems": "start",
             "columnGap": "0px",
             "rowGap": "4px",
-            "marginTop": "8px",
-            "padding": "10px 12px",
+            "marginTop": "-5px",
+            "padding": "2px 4px",
             "backgroundColor": "#f8f9fa",
-            "border": "1px solid #dee2e6",
+            "border": "1px solid transparent"
+            if header == "Metric Weights"
+            else "1px solid #dee2e6",
             "borderRadius": "6px",
             "width": "100%",
             "minWidth": "0",
@@ -266,13 +290,25 @@ def build_weight_components(
         ),
     ]
 
+    model_levels = getattr(table, "model_levels_of_theory", None)
+    metric_levels = getattr(table, "metric_levels_of_theory", None)
+    model_configs = getattr(table, "model_configs", None)
+
     # Callbacks to update table scores when table weight dicts change
     if table.id != "summary-table":
         register_category_table_callbacks(
-            table_id=table.id, use_thresholds=use_thresholds
+            table_id=table.id,
+            use_thresholds=use_thresholds,
+            model_levels=model_levels,
+            metric_levels=metric_levels,
+            model_configs=model_configs,
         )
     else:
-        register_summary_table_callbacks()
+        register_summary_table_callbacks(
+            model_levels=model_levels,
+            metric_levels=metric_levels,
+            model_configs=model_configs,
+        )
 
     # Callbacks to sync sliders, text boxes, and stored table weights
     for column, input_id in zip(columns, input_ids, strict=True):
@@ -481,7 +517,6 @@ def build_test_layout(
             table_id=table.id,
             column_widths=column_widths,
         )
-        layout_contents.append(threshold_controls)
 
     # Add metric-weight controls for every benchmark table
     metric_weights = build_weight_components(
@@ -492,7 +527,41 @@ def build_test_layout(
         column_widths=column_widths,
         thresholds=thresholds,
     )
-    if metric_weights:
+    if threshold_controls and metric_weights:
+        # Combine threshold and weight panels in a single card while trimming the extra
+        # <Br/> injected at the top of the weight component so the boundary box hugs
+        # both controls.
+        # The first child of the weight component is always the spacer <Br/> returned by
+        # build_weight_components. Drop it from the weights so the metric weights box
+        # hugs the threshold box.
+        weight_children = metric_weights.children
+        weight_children = weight_children[1:]
+        compact_weights = Div(weight_children)
+
+        # Insert a single spacer before the combined card so its top aligns with the
+        # elements above (e.g. the table). The thresholds + weights content then sit
+        # within the shared box.
+        layout_contents.append(Br())
+        layout_contents.append(
+            Div(
+                [
+                    Div(threshold_controls, style={"marginBottom": "0px"}),
+                    Div(compact_weights, style={"marginTop": "0"}),
+                ],
+                style={
+                    "backgroundColor": "#f8f9fa",
+                    "border": "1px solid #dee2e6",
+                    "borderRadius": "6px",
+                    "padding": "0px 0px 0px 0px",  # top right bottom left
+                    "marginTop": "-5px",
+                    "boxSizing": "border-box",
+                    "width": "100%",
+                },
+            )
+        )
+    elif threshold_controls:
+        layout_contents.append(threshold_controls)
+    elif metric_weights:
         layout_contents.append(metric_weights)
 
     layout_contents.append(
@@ -543,10 +612,10 @@ def build_threshold_inputs(
         "justifyItems": "center",
         "columnGap": "0px",
         "rowGap": "0px",
-        "marginTop": "10px",
-        "padding": "4px 8px",
+        "marginTop": "0px",
+        "padding": "2px 2px",
         "backgroundColor": "#f8f9fa",
-        "border": "1px solid #dee2e6",
+        "border": "1px solid transparent",
         "borderRadius": "5px",
         "width": "100%",
         "minWidth": "0",
@@ -567,6 +636,8 @@ def build_threshold_inputs(
                         "padding": "2px 4px",
                         "whiteSpace": "nowrap",
                         "boxSizing": "border-box",
+                        "color": "#212529",
+                        "border": "1px solid transparent",
                     },
                 ),
                 Button(
@@ -576,18 +647,20 @@ def build_threshold_inputs(
                     style={
                         "fontSize": "11px",
                         "padding": "4px 8px",
-                        "marginTop": "4px",
+                        "marginTop": "0px",
+                        "marginLeft": "4px",
                         "backgroundColor": "#6c757d",
                         "color": "white",
                         "border": "none",
                         "borderRadius": "3px",
                         "width": "fit-content",
+                        "cursor": "pointer",
                     },
                 ),
                 # Toggle to view normalized metric values in the table
                 Checklist(
                     id=f"{table_id}-normalized-toggle",
-                    options=[{"label": "Show normalized values", "value": "norm"}],
+                    options=[{"label": "Show normalised scores", "value": "norm"}],
                     value=[],
                     style={"marginTop": "6px", "fontSize": "11px"},
                     inputStyle={"marginRight": "6px"},
@@ -619,24 +692,26 @@ def build_threshold_inputs(
             "unit": unit_label,
         }
 
+        first_metric = metric == table_columns[0]
+
         good_children = [
             Label(
-                "Good:",
+                "Good:" if first_metric else "",
                 style={
                     "fontSize": "13px",
                     "color": "lightseagreen",
                     "textAlign": "right",
                     "position": "absolute",
-                    "right": "calc(50% + 52px)",
+                    "right": "calc(50% + 40px)",
                 },
             ),
             DCC_Input(
                 id=f"{table_id}-{metric}-good-threshold",
                 type="number",
                 value=good_val,
-                step=0.001,
+                step=0.01,
                 style={
-                    "width": "80px",
+                    "width": "60px",
                     "fontSize": "12px",
                     "padding": "2px 4px",
                     "border": "1px solid lightseagreen",
@@ -654,7 +729,7 @@ def build_threshold_inputs(
                         "fontSize": "12px",
                         "color": "#6c757d",
                         "position": "absolute",
-                        "left": "calc(50% + 52px)",
+                        "left": "calc(50% + 40px)",
                         "top": "50%",
                         "transform": "translateY(-50%)",
                         "whiteSpace": "nowrap",
@@ -664,13 +739,13 @@ def build_threshold_inputs(
 
         bad_children = [
             Label(
-                "Bad:",
+                "Bad:" if first_metric else "",
                 style={
                     "fontSize": "13px",
                     "color": "#dc3545",
                     "textAlign": "right",
                     "position": "absolute",
-                    "right": "calc(50% + 52px)",
+                    "right": "calc(50% + 40px)",
                     "top": "50%",
                     "transform": "translateY(-50%)",
                     "whiteSpace": "nowrap",
@@ -680,9 +755,9 @@ def build_threshold_inputs(
                 id=f"{table_id}-{metric}-bad-threshold",
                 type="number",
                 value=bad_val,
-                step=0.001,
+                step=0.01,
                 style={
-                    "width": "80px",
+                    "width": "60px",
                     "fontSize": "12px",
                     "padding": "2px 4px",
                     "border": "1px solid #dc3545",
@@ -700,7 +775,7 @@ def build_threshold_inputs(
                         "fontSize": "12px",
                         "color": "#6c757d",
                         "position": "absolute",
-                        "left": "calc(50% + 52px)",
+                        "left": "calc(50% + 40px)",
                         "top": "50%",
                         "transform": "translateY(-50%)",
                         "whiteSpace": "nowrap",
@@ -721,7 +796,7 @@ def build_threshold_inputs(
                             "display": "flex",
                             "justifyContent": "center",
                             "alignItems": "center",
-                            "marginBottom": "4px",
+                            "marginBottom": "2px",
                         },
                     ),
                     Div(
