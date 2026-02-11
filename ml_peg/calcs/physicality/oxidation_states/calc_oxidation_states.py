@@ -6,10 +6,10 @@ from pathlib import Path
 from typing import Any
 
 from ase.io import read
-from janus_core.calculations.md import NPT
 from aseMolec import anaAtoms
-import pytest
+from janus_core.calculations.md import NPT
 import numpy as np
+import pytest
 
 from ml_peg.models.get_models import load_models
 from ml_peg.models.models import current_models
@@ -48,17 +48,12 @@ def test_iron_oxidation_state_md(mlip: tuple[str, Any]) -> None:
             struct=struct,
             steps=40000,
             timestep=0.5,
-            stats_every=100,
-            traj_every=200,
+            stats_every=50,
+            traj_every=100,
             traj_append=True,
             thermostat_time=50,
-            #bulk_modulus=10,
             barostat_time=None,
-            # pressuddre=pressure,
             file_prefix=OUT_PATH / f"{salt}_{model_name}",
-            # restart=True,
-            # restart_auto=True,
-            # post_process_kwargs={"rdf_compute": True, "rdf_rmax": 6, "rdf_bins": 120},
         )
         npt.run()
 
@@ -74,42 +69,20 @@ def test_iron_oxygen_rdfs(mlip: tuple[str, Any]) -> None:
         Name of model used and model.
     """
     model_name, model = mlip
-    fct={'Fe': 0.1, 'O': 0.7, 'H': 0.7, 'Cl': 0.1}
+    fct = {"Fe": 0.1, "O": 0.7, "H": 0.7, "Cl": 0.1}
 
     for salt in IRON_SALTS:
-        MD_path = OUT_PATH / f"{salt}_{model_name}-traj.extxyz"
-        traj = read(MD_path, "200:")
-        rdfs, radii = anaAtoms.compute_rdfs_traj_avg(traj, rmax=6.0, nbins=300, fct=fct) # need to skip initial equilibration frames
+        md_path = OUT_PATH / f"{salt}_{model_name}-traj.extxyz"
+        traj = read(md_path, ":")
+        rdfs, radii = anaAtoms.compute_rdfs_traj_avg(
+            traj, rmax=6.0, nbins=100, fct=fct
+        )  # need to skip initial equilibration frames
 
         rdf_data = np.column_stack((radii, rdfs["OFe_inter"]))
-        
-        RDF_path = OUT_PATH / f"OFe_inter_{salt}_{model_name}.rdf"
+
+        rdf_path = OUT_PATH / f"OFe_inter_{salt}_{model_name}.rdf"
         np.savetxt(
-            RDF_path,
+            rdf_path,
             rdf_data,
             header="r g(r)",
         )
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

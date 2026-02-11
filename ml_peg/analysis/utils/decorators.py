@@ -431,6 +431,7 @@ def plot_scatter(
     x_label: str | None = None,
     y_label: str | None = None,
     show_line: bool = False,
+    show_markers: bool = True,
     hoverdata: dict | None = None,
     filename: str = "scatter.json",
 ) -> Callable:
@@ -447,6 +448,8 @@ def plot_scatter(
         Label for y-axis. Default is `None`.
     show_line
         Whether to show line between points. Default is False.
+    show_markers
+        Whether to show markers on the plot. Default is True.
     hoverdata
         Hover data dictionary. Default is `{}`.
     filename
@@ -499,7 +502,13 @@ def plot_scatter(
                     hovertemplate += f"<b>{key}: </b>%{{customdata[{i}]}}<br>"
                 customdata = list(zip(*hoverdata.values(), strict=True))
 
-            mode = "lines+markers" if show_line else "markers"
+            modes = []
+            if show_line:
+                modes.append("lines")
+            if show_markers:
+                modes.append("markers")
+
+            mode = "+".join(modes)
 
             fig = go.Figure()
             for mlip, value in results.items():
