@@ -6,9 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from ase.io import read
-from aseMolec import anaAtoms
 from janus_core.calculations.md import NPT
-import numpy as np
 import pytest
 
 from ml_peg.models.get_models import load_models
@@ -19,7 +17,7 @@ MODELS = load_models(current_models)
 DATA_PATH = Path(__file__).parent / "data"
 OUT_PATH = Path(__file__).parent / "outputs"
 
-TRANSITION_METALS = ["Co"]#, "Cr", "Fe", "Mn", "V", "Ti"]
+TRANSITION_METALS = ["Co"]  # , "Cr", "Fe", "Mn", "V", "Ti"]
 
 
 @pytest.mark.very_slow
@@ -33,7 +31,6 @@ def test_transition_metal_water_md(mlip: tuple[str, Any]) -> None:
     mlip
         Name of model use and model.
     """
-
     model_name, model = mlip
     model.device = "cuda"
     model.default_dtype = "float32"
