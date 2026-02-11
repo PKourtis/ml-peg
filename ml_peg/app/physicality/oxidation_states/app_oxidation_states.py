@@ -1,4 +1,4 @@
-""" Run oxidation states app"""
+"""Run oxidation states app."""
 
 from __future__ import annotations
 
@@ -12,15 +12,14 @@ from ml_peg.app.utils.build_callbacks import (
 )
 from ml_peg.app.utils.load import read_plot
 from ml_peg.calcs import CALCS_ROOT
-from ml_peg.models.get_models import get_model_names
-from ml_peg.models.models import current_models
 
 # MODELS = get_model_names(current_models)
-MODELS = ["omol", "0totchrg_2L_fl32_new"]
+MODELS = ["mace-mp-0b3", "omol", "0totchrg_2L_fl32_new"]
 
 BENCHMARK_NAME = "Iron Oxidation States"
 DATA_PATH = APP_ROOT / "data" / "physicality" / "oxidation_states"
 REF_PATH = CALCS_ROOT / "physicality" / "oxidation_states" / "data"
+
 
 class FeOxidationStatesApp(BaseApp):
     """Fe Oxidation States benchmark app layout and callbacks."""
@@ -61,7 +60,7 @@ def get_app() -> FeOxidationStatesApp:
         name=BENCHMARK_NAME,
         description=(
             "Evaluate model ability to capture different oxidation states of Fe"
-            "from aqueous Fe 2Cl and Fe 3Cl MD RDFs" 
+            "from aqueous Fe 2Cl and Fe 3Cl MD RDFs"
         ),
         # docs_url=DOCS_URL,
         table_path=DATA_PATH / "oxidation_states_table.json",
