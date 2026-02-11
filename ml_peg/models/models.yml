@@ -128,6 +128,7 @@ omol:
   kwargs:
     model: "extra_large"
 
+
 0totchrg_2L_fl32_new:
   module: mace.calculators
   class_name: mace_omol
@@ -137,7 +138,7 @@ omol:
   default_dtype: float64
   kwargs:
     model: "extra_large"
-    
+
 # mace-mh-1-omol:
 #   module: mace.calculators
 #   class_name: mace_mp

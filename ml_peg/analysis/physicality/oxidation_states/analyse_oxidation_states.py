@@ -24,6 +24,10 @@ DEFAULT_THRESHOLDS, DEFAULT_TOOLTIPS, _ = load_metrics_config(METRICS_CONFIG_PAT
 
 IRON_SALTS = ["Fe2Cl", "Fe3Cl"]
 TESTS = ["Fe-O RDF Peak Split", "Peak Within DFT Ref"]
+REF_PEAK_RANGE = {
+    "Fe<sup>+2</sup><br>Ref": [2.0, 2.2],
+    "Fe<sup>+3</sup><br>Ref": [1.9, 2.0],
+}
 
 
 def get_rdf_results(
@@ -76,6 +80,8 @@ def plot_rdfs(model: str, results: dict[str, tuple[list[float], list[float]]]) -
         y_label="Fe-O G(r)",
         show_line=True,
         show_markers=False,
+        highlight_area=True,
+        highlight_range=REF_PEAK_RANGE,
     )
     def plot_result() -> dict[str, tuple[list[float], list[float]]]:
         """

@@ -36,6 +36,7 @@ dependencies = [
     "MDAnalysis",
     "openpyxl",
     "tqdm",
+    "aseMolec @ https://github.com/imagdau/aseMolec.git"
 ]
 
 [project.optional-dependencies]
@@ -52,7 +53,11 @@ grace = [
     "tensorpotential == 0.5.1; python_version < '3.13'",
 ]
 mace = [
-    "mace-torch==0.3.14",
+    "mace-torch @ https://github.com/ACEsuit/mace.git",
+    "cuequivariance==0.8.1",
+    "cuequivariance-ops-cu12==0.8.1",
+    "cuequivariance-ops-torch-cu12==0.8.1",
+    "cuequivariance-torch==0.8.1",
 ]
 
 mattersim = [

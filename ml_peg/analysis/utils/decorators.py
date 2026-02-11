@@ -13,6 +13,7 @@ from typing import Any
 from dash import dash_table
 import numpy as np
 import pandas as pd
+import plotly.colors as pc
 import plotly.graph_objects as go
 
 from ml_peg.analysis.utils.utils import calc_table_scores
@@ -434,6 +435,8 @@ def plot_scatter(
     show_markers: bool = True,
     hoverdata: dict | None = None,
     filename: str = "scatter.json",
+    highlight_area: bool = False,
+    highlight_range: dict = None,
 ) -> Callable:
     """
     Plot scatter plot of MLIP results.
@@ -454,6 +457,10 @@ def plot_scatter(
         Hover data dictionary. Default is `{}`.
     filename
         Filename to save plot as JSON. Default is "scatter.json".
+    highlight_area
+        Whether to add a highlighted rectangle to the plot.
+    highlight_range
+        Dictionary of rectangle title and x-axis endpoints.
 
     Returns
     -------
@@ -523,6 +530,20 @@ def plot_scatter(
                         hovertemplate=hovertemplate,
                     )
                 )
+
+                colors = pc.qualitative.Plotly
+
+                if highlight_area:
+                    for i, (title, range) in enumerate(highlight_range.items()):
+                        fig.add_vrect(
+                            x0=range[0],
+                            x1=range[1],
+                            annotation_text=title,
+                            annotation_position="top",
+                            fillcolor=colors[i],
+                            opacity=0.25,
+                            line_width=0,
+                        )
 
             fig.update_layout(
                 title={"text": title},
